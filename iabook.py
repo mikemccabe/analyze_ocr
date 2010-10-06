@@ -1,11 +1,13 @@
+import sys
 import os
 from StringIO import StringIO
 from lxml import etree
 import zipfile
 import gzip
 import re
+from collections import namedtuple
 
-
+ns="{http://www.abbyy.com/FineReader_xml/FineReader6-schema-v1.xml}"
 class Book(object):
     def __init__(self, book_id, doc, book_path):
         self.book_id = book_id
@@ -87,6 +89,128 @@ class Book(object):
         if leafcount is not None:
             leafcount = int(leafcount)
         return leafcount
+
+    def get_pages_as_abbyy(self):
+        abbyy = self.get_abbyy()
+        scandata_iter = self.get_scandata_pages()
+        for i, (event, page) in enumerate(etree.iterparse(abbyy,
+                                                          tag=ns+'page')):
+            yield abbyypage(i, page, scandata_iter.next())
+
+    def get_pages_as_djvu(self):
+        djvu = self.get_djvu_xml()
+        scandata_iter = self.get_scandata_pages_djvu()
+        for i, (event, page) in enumerate(etree.iterparse(djvu,
+                                                          tag='OBJECT')):
+            yield djvupage(i, page, scandata_iter.next())
+
+
+box = namedtuple('box', 'l t r b')
+
+
+# class scandata_page:
+#     def __init__(self, sd):
+#         self.sd = sd
+#     def pageno():
+
+
+class abspage(object):
+    def __init__(self, i, page, page_scandata):
+        self.index = i
+        self.page = page
+        self.scandata = page_scandata
+        self.info = {}
+
+
+class djvupage(abspage):
+    def get_words(self):
+        lines = self.page.findall('.//LINE')
+        for line in lines:
+            words = line.findall('.//WORD')
+            for word in words:
+                # sometimes 4 coords, sometimes 5
+                l, b, r, t = word.get('coords').split(',')[:4]
+                # if (int(b) - int(t)) < 50:
+                #     continue
+                text = word.text
+                # l b r t
+                text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
+                yield text.lower()
+    def find_text_bounds(self):
+        l = t = sys.maxint
+        r = b = 0
+        textfound = False
+        lines = self.page.findall('.//LINE')
+        for line in lines:
+            words = line.findall('.//WORD')
+            if len(words) == 0:
+                continue
+            textfound = True
+            for word in (words[0], words[-1]):
+                intcoords = [int(w) for w in word.get('coords').split(',')]
+                bl, bb, br, bt = intcoords[:4]
+                if bl < l: l = bl
+                if bt < t: t = bt
+                if br > r: r = br
+                if bb > b: b = bb
+        if not textfound:
+            l = 0
+            t = 0
+            r = int(self.page.get('width'))
+            b = int(self.page.get('height'))
+        return box(l, t, r, b)
+    def clear(self):
+        self.page.clear()
+        self.page = None
+
+
+class abbyypage(abspage):
+    def get_words(self):
+        findexpr = './/'+abbyy_ns+'charParams'
+        chars = []
+        for char in self.page.findall(findexpr):
+            if char.get('wordStart') == 'true':
+                if len(chars) > 0:
+                    yield ''.join(c.text for c in chars).lower()
+                    chars = []
+                text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
+            if char.text not in (' ', '.', '"', ';', '/', '\'', ':'):
+                chars.append(char)
+            else:
+                pass
+        if len(chars) > 0:
+            yield ''.join(c.text for c in chars).lower()
+            chars = []
+    def find_text_bounds(self):
+        l = t = sys.maxint
+        r = b = 0
+        textfound = False
+        for block in self.page.findall('.//'+ns+'block'):
+            if block.get('blockType') != 'Text':
+                continue
+            textfound = True
+            bl = int(block.get('l'))
+            if bl < l: l = bl
+
+            bt = int(block.get('t'))
+            if bt < t: t = bt
+
+            br = int(block.get('r'))
+            if br > r: r = br
+
+            bb = int(block.get('b'))
+            if bb > b: b = bb
+
+        if not textfound:
+            l = 0
+            t = 0
+            r = int(self.page.get('width'))
+            b = int(self.page.get('height'))
+        return box(l, t, r, b)
+    def clear(self):
+        self.page.clear()
+        self.page = None
+
 
 def nsify(tagpath, ns) :
     return '/'.join(ns + tag for tag in tagpath)
