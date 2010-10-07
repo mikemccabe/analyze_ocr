@@ -25,7 +25,7 @@ def main(args):
         page.clear()
     windowed_pages = windowed_iterator(pages, 5, clear_page)
     pages = analyze(windowed_pages)
-    toc = make_toc.make_toc(pages)
+    toc = make_toc.make_toc(iabook, pages)
     # consume(pages)
 
 
