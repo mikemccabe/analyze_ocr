@@ -90,6 +90,13 @@ class Book(object):
             leafcount = int(leafcount)
         return leafcount
 
+
+    def get_contents_count(self):
+        return len([True for e
+                    in self.scandata.findall('.//%spageType' % (self.scandata_ns))
+                    if e.text.lower() == 'contents'])
+
+
     def get_pages_as_abbyy(self):
         abbyy = self.get_abbyy()
         scandata_iter = self.get_scandata_pages()
