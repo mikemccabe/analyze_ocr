@@ -142,7 +142,9 @@ class djvupage(abspage):
                 text = word.text
                 # l b r t
                 text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
-                yield text.lower()
+                text.strip()
+                if len(text) > 0:
+                    yield text.lower().encode('ascii', 'ignore')
     def find_text_bounds(self):
         l = t = sys.maxint
         r = b = 0
@@ -173,12 +175,16 @@ class djvupage(abspage):
 
 class abbyypage(abspage):
     def get_words(self):
-        findexpr = './/'+abbyy_ns+'charParams'
+        findexpr = './/'+ns+'charParams'
         chars = []
         for char in self.page.findall(findexpr):
             if char.get('wordStart') == 'true':
                 if len(chars) > 0:
-                    yield ''.join(c.text for c in chars).lower()
+                    # xxx not sure if necessary
+                    t = ''.join(c.text for c in chars).lower().encode('ascii', 'ignore')
+                    t.strip()
+                    if len(t) > 0:
+                        yield t
                     chars = []
                 text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
             if char.text not in (' ', '.', '"', ';', '/', '\'', ':'):
@@ -186,7 +192,11 @@ class abbyypage(abspage):
             else:
                 pass
         if len(chars) > 0:
-            yield ''.join(c.text for c in chars).lower()
+            # xxx not sure if necessary
+            t = ''.join(c.text for c in chars).lower().encode('ascii', 'ignore')
+            t.strip()
+            if len(t) > 0:
+                yield t
             chars = []
     def find_text_bounds(self):
         l = t = sys.maxint
