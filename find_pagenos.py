@@ -84,26 +84,33 @@ def pageno_candidates(pageinfo, page, index):
     top_margin = pagebounds.t + page_height * margin
     bottom_margin = pagebounds.b - page_height * margin
 
-    findexpr = './/'+ns+'formatting'
-    for fmt in page.findall(findexpr):
 
-        # move on if not near page top/bottom
-        line = fmt.getparent()
-        t = int(line.get('t'))
-        b = int(line.get('b'))
 
-        if t > top_margin and t < bottom_margin:
-            continue
+    # findexpr = './/'+ns+'formatting'
+    # for fmt in page.findall(findexpr):
 
-        fmt_text = etree.tostring(fmt,
-                                  method='text',
-                                  encoding=unicode).lower();
+        # # move on if not near page top/bottom
+        # line = fmt.getparent()
+        # t = int(line.get('t'))
+        # b = int(line.get('b'))
+
+        # if t > top_margin and t < bottom_margin:
+        #     continue
+
+        # fmt_text = etree.tostring(fmt,
+        #                           method='text',
+        #                           encoding=unicode).lower();
+    for word in pageinfo.get_words():
+        fmt_text = word
+
+        # def find_coords(m):
+        #     # l t r b
+        #     start, end = m.span()
+        #     if end >= len(fmt):
+        #         end = len(fmt) - 1
+        #     return Coord(fmt[start].get('l'), t, fmt[end].get('r'), b)
         def find_coords(m):
-            # l t r b
-            start, end = m.span()
-            if end >= len(fmt):
-                end = len(fmt) - 1
-            return Coord(fmt[start].get('l'), t, fmt[end].get('r'), b)
+            return Coord(1,2,3,4)
 
         # look for roman numerals
         # fix some common OCR errors
@@ -123,9 +130,11 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('roman', num_str, i, index - i,
-                                       [(fmt, find_coords(m))])
+                                       [(word, find_coords(m))])
+                                       # [(fmt, find_coords(m))])
             else:
-                seen[num_str].coords.append((fmt, find_coords(m)))
+                seen[num_str].coords.append((word, find_coords(m)))
+                # seen[num_str].coords.append((fmt, find_coords(m)))
             yield seen[num_str]
 
         # look for arabic numerals
@@ -140,7 +149,9 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('arabic', num_str, i, index - i,
-                                       [(fmt, find_coords(m))])
+                                       [(word, find_coords(m))])
+                                       # [(fmt, find_coords(m))])
             else:
-                seen[num_str].coords.append((fmt, find_coords(m)))
+                seen[num_str].coords.append((word, find_coords(m)))
+                # seen[num_str].coords.append((fmt, find_coords(m)))
             yield seen[num_str]
