@@ -42,3 +42,6 @@ class Word(namedtuple('Word', 'text chars')):
     # def clear(self):
     #     for char in chars:
     #         char.clear()
+
+class pagenocand(namedtuple('pagenocand', 'numtype val word_index')):
+    pass
