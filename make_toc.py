@@ -67,7 +67,6 @@ class RangeMatch(object):
         self.pageno = page.info['number']
         self.nearno = -1 # index of nearby page_cand
         self.match = match
-        self.pagenos = { self.pageno : 1 }
         self.notes = ''
     def __repr__(self):
         words = ' '.join(self.tc.words[i] for i in range(self.match.b, self.match.b + self.match.size)).encode('utf-8')
@@ -119,10 +118,12 @@ class TocCandidate(object):
         pass
 
     def find_nearnos(self, match):
-        # worry later about contained.  for now: just next and prev:
+        # XXX worry later about contained.  for now: just next and prev:
+        # note that current next, prev is from *end* of match
         left = None
         right = None
         for right in self.pageno_candidates:
+
             if match.b + match.size - 1 < right.word_index:
                 break;
             left = right
@@ -229,7 +230,11 @@ class TocCandidate(object):
                 if r != 0:
                     yield pagenocand('0roman', r, i)
                 if word.isdigit():
-                    yield pagenocand('1arabic', int(word), i)
+                    val = int(word):
+                    if val < 999:
+                        # XXX replace above check with book page count
+                        # if avail.
+                        yield pagenocand('1arabic', int(word), i)
                 lastword = word
         def printword(c):
             ar, val, loc = c
