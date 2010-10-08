@@ -6,7 +6,8 @@ import find_header_footer
 import make_toc
 
 djvu = True
-pagenos = False
+# djvu = False
+pagenos = True
 hfs = False
 
 scandata_ns = ''
