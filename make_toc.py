@@ -1,3 +1,4 @@
+import sys
 from difflib import SequenceMatcher, get_close_matches, Match
 from extract_sorted import extract_sorted
 from rnums import rnum_to_int
@@ -6,18 +7,25 @@ from interval import Interval, IntervalSet
 from collections import namedtuple
 
 
+def l(s):
+    sys.stderr.write(str(s) + '\n')
+
 class pagenocand(namedtuple('pagenocand', 'numtype val word_index')):
     pass
 
 def make_toc(iabook, pages):
     contentscount = iabook.get_contents_count()
-    contentscount = 0
+    # contentscount = 0
+
     skipfirst = 0
     n = 13
-    n_optimistic = 1
+    max_assumed_toc = 10
+    n_optimistic = max_assumed_toc
     tcs = []
     thresh = 5 # if some tc page goes above this score, then...
     starttoc = 0 # starttoc is set to skip prev pages.
+    max_assumed_toc_len = 5
+    endtoc = sys.maxint
     for page in pages:
         if (len(page.info['number']) == 0
             and 'pageno_guess' in page.info):
@@ -34,28 +42,62 @@ def make_toc(iabook, pages):
             continue
         if page.index < skipfirst:
             continue
-        print "%s: %s %s" % (page.index, page.info['number'],
-                             page.info['type'])
+        l("%s: %s %s" % (page.index, page.info['number'],
+                             page.info['type']))
         wipetil = 0
         score = 0
         for i, tc in enumerate(tcs):
             if i < starttoc:
                 continue
-            print 'MATCH WITH TC PAGE %s' % i
+            if i > endtoc:
+                continue
+            l('MATCH WITH TC PAGE %s' % i)
             tc.match_page(page)
-            if starttoc == 0 and tc.score > thresh:
+            if tc.score > thresh:
                 starttoc = i
+                if endtoc != sys.maxint:
+                    endtoc = starttoc + max_assumed_toc_len
+
         # if contentscount is
         # 0: build contents pages for first n pages - need to remember to score all
-        # 2+: build contents pages exactly for designated pages
+        # 2+: bnuild contents pages exactly for designated pages
         # 1: skip pages before 1rst contents page, build n_optimistic pages, remember to score later pages
         if ((contentscount == 0 and len(tcs) < n)
             or (contentscount == 1 and len(tcs) < n_optimistic)
             or (contentscount > 1 and len(tcs) < contentscount
                 and page.info['type'] == 'contents')):
                 tcs.append(TocCandidate(page))
+    # for tc in tcs:
+    #     tc.printme()
+    result = []
     for tc in tcs:
-        tc.printme()
+        if tc.score > thresh:
+            for match in tc.matches:
+                info = tc.matchinfo[match]
+                tocitem_words = info.matchwords()
+                pagenum = info.nearno
+                if info.nearno != -1:
+                    pagenum = tc.words[pagenum]
+                labelwords, titlewords = guess_label(tocitem_words)
+                result.append({'level':1, 'label':(' '.join(labelwords)).strip(),
+                               'title':(' '.join(titlewords)).strip(), 'pagenum':pagenum})
+    return result
+
+
+
+labels = ('chapter', 'part', 'section', 'book',
+#              'preface', 'appendix', 'footnotes'
+          )
+def guess_label(words):
+    labelwords = []
+    if len(words) > 1:
+        if words[0].lower() in labels:
+            labelwords.append(words.pop(0))
+            if len(words) > 1 and (words[0].isdigit()
+                                   or rnum_to_int(words[0]) != 0):
+                labelwords.append(words.pop(0))
+    return labelwords, words
+
 
 class RangeMatch(object):
     # intervals, in the intervalset, point here
@@ -69,13 +111,22 @@ class RangeMatch(object):
         self.match = match
         self.notes = ''
     def __repr__(self):
+        nearno_mapped = 0
+        if self.nearno != -1:
+            nearno_mapped = self.tc.words[self.nearno]
         words = ' '.join(self.tc.words[i] for i in range(self.match.b, self.match.b + self.match.size)).encode('utf-8')
-        return "%s\tscore %s pageno %s\t%s pagenos %s notes %s" % (self.match,
-                                                         self.score,
-                                                         self.pageno,
-                                                         words,
-                                                         self.pagenos,
-                                                         self.notes)
+        return "%s\tscore %s pageno %s nearno i%s v%s\t%s notes %s" % (self.match,
+                                                                  self.score,
+                                                                  self.pageno,
+                                                                  self.nearno,
+                                                                  nearno_mapped,
+                                                                  words,
+                                                                  self.notes)
+    def matchwords(self):
+        adj = 0
+        if self.nearno != -1:
+            adj = self.nearno - (self.match.b + self.match.size)
+        return self.tc.words[self.match.b:self.match.b + self.match.size + adj]
 
 
 class RangeSet(object):
@@ -96,12 +147,18 @@ class TocCandidate(object):
         self.page = page
         self.matcher = SequenceMatcher()
         self.words = [word for word in page.get_words()]
+        for i in range(4):
+            if i < len(self.words):
+                if self.words[i] == 'contents':
+                    self.words[i] = ''
+                if self.words[i] == 'page':
+                    self.words[i] = ''
         self.wordhash = {}
         for word in self.words:
             self.wordhash[word] = True
         self.matcher.set_seq2(self.words)
-        print '\n'.join('%s:%s' % (i, w) for i, w in enumerate(self.words))
-        print 'content len: %s' % len(self.words)
+        l('\n'.join('%s:%s' % (i, w) for i, w in enumerate(self.words)))
+        l('content len: %s' % len(self.words))
         self.lookaside = {}
         self.pageno_candidates = self.find_pageno_candidates(page)
         self.matches = IntervalSet()
@@ -131,10 +188,9 @@ class TocCandidate(object):
 
 
     def add_match(self, page, match):
-        print
-        print match
+        l('ADDING ' + str(match))
         info = RangeMatch(self, page, match)
-        print info
+        l(info)
         pageno = page.info['number']
         pagenoval = rnum_to_int(pageno)
         if pagenoval == 0 and len(pageno) > 0:
@@ -144,25 +200,23 @@ class TocCandidate(object):
 
         overlaps = [m for m in self.matches
                     if m & matchint]
-        # print overlaps
 
         # if nearnos matches either, mark flag and amp score
         if pageno:
             nearnos = self.find_nearnos(match)
-            print "GREPME near is [%s] pagenoval %s" % (nearnos, pagenoval)
+            l("GREPME near is [%s] pagenoval %s" % (nearnos, pagenoval))
             for no in nearnos[1], nearnos[0]:
                 if no is not None:
-                    print no.val
+                    l(no.val)
                     if no.val == pagenoval:
                         info.notes += 'nearno: %s' % pageno
-                        print "GREPME MATCH tc %s, %s %s" % (self.page.index, pageno, self.score)
+                        l("GOODMATCH tc %s, %s %s" % (self.page.index, pageno, self.score))
                         self.score += 1
+                        info.nearno = no.word_index
                         break
-                    if no.val > pagenoval - 10:
+                    if no.val > pagenoval - 10 and match.a < 10:
                         self.score += .01
                         break
-
-        print 'GREPME info now %s' % (info)
 
         # cases: no overlap
         if len(overlaps) == 0:
@@ -175,14 +229,19 @@ class TocCandidate(object):
                 oinfo = self.matchinfo[i]
                 ostart = oinfo.match.b
                 oend = oinfo.match.b + oinfo.match.size
+                scootback = 0
                 if ostart < start:
+                    scootback = start - ostart
                     start = ostart
                 if oend > end:
                     end = oend
-                info.match = Match(0, start, end - start)
-                info.score += oinfo.score
-                info.pageno = oinfo.pageno
-                info.notes = info.notes + ' ' + info.notes
+                info.match = Match(info.match.a - scootback, start, end - start)
+                if oinfo.nearno != -1:
+                    # assert(info.nearno == -1)
+                    info.nearno = oinfo.nearno
+                # info.score += oinfo.score
+                # info.pageno = oinfo.pageno
+                # info.notes = info.notes + ' ' + info.notes
                 # for opageno in oinfo.pagenos:
                 #     opagecount = oinfo.pagenos[opageno]
                 #     if opageno in info.pagenos:
@@ -198,10 +257,10 @@ class TocCandidate(object):
         #         if info.pageno == page.info
 
 
-        print "%s %s" % (len(self.matches), self.matches)
-        for ival in self.matches:
-            info = self.matchinfo[ival]
-            print "%s %s" % (ival, info)
+        # print "%s %s" % (len(self.matches), self.matches)
+        # for ival in self.matches:
+        #     info = self.matchinfo[ival]
+        #     print "%s %s" % (ival, info)
 
 
         # overlap
@@ -230,7 +289,7 @@ class TocCandidate(object):
                 if r != 0:
                     yield pagenocand('0roman', r, i)
                 if word.isdigit():
-                    val = int(word):
+                    val = int(word)
                     if val < 999:
                         # XXX replace above check with book page count
                         # if avail.
@@ -241,22 +300,22 @@ class TocCandidate(object):
             print "%s %s - %s" % (ar, val, self.words[loc])
         page_cands = [c for c in get_page_cands(page)]
         #
-        print 'cands'
-        for c in page_cands:
-            printword(c)
-        print page_cands
+        # print 'cands'
+        # for c in page_cands:
+        #     printword(c)
+        # print page_cands
         #
         result = page_cands
         # if len(page_cands) != 0:
         #     result = extract_sorted(page_cands)
-        print 'page_nums'
-        for c in result:
-            printword(c)
+        # print 'page_nums'
+        # for c in result:
+        #     printword(c)
         return result
 
     def match_page(self, page):
-        words = [word for word in page.get_words()]
-        print ' '.join(words).encode('utf-8')
+        words = [word for word in page.get_words()][:30]
+        # print ' '.join(words).encode('utf-8')
         for i, word in enumerate(words):
             words[i] = self.reify(word)
         self.matcher.set_seq1(words)
@@ -294,7 +353,7 @@ class TocCandidate(object):
         candidates = get_close_matches(word, self.words, n=1, cutoff=.9)
         if len(candidates) > 0:
             candidate = candidates[0]
-            print "%s --> %s" % (word.encode('utf-8'), candidate.encode('utf-8'))
+            # print "%s --> %s" % (word.encode('utf-8'), candidate.encode('utf-8'))
             self.lookaside[word] = candidate
             return candidate
         self.lookaside[word] = word

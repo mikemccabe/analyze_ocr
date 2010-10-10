@@ -31,7 +31,7 @@ class Pageno(namedtuple('Pageno', 'type string value offset coords')):
         #          del self.info['hf_guesses'][i]
         #     del self.info['hf_guesses']
 
-class Coord(namedtuple('Coord', 'l t r b')):
+class box(namedtuple('Coord', 'l t r b')):
     pass
     # def findcenter(self):
     #     return (float(self.l) + (float(self.r) - float(self.l)) / 2,

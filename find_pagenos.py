@@ -50,7 +50,7 @@ def guess_best_pageno(pageinfo, pages, window=None):
     pageno_guess = None
     if mostsofar:
         pageno_guess = pageinfo.index - int(mostsofar)
-        print 'index %s: page guess %s %s' % (pageinfo.index, pageno_guess, likelytype)
+        # print 'index %s: page guess %s %s' % (pageinfo.index, pageno_guess, likelytype)
         pageinfo.info['pageno_guess'] = pageno_guess
 
         # if a page coord candidate on *this* page matches, capture it
@@ -103,14 +103,14 @@ def pageno_candidates(pageinfo, page, index):
     for word in pageinfo.get_words():
         fmt_text = word
 
-        # def find_coords(m):
+        # def find_box(m):
         #     # l t r b
         #     start, end = m.span()
         #     if end >= len(fmt):
         #         end = len(fmt) - 1
         #     return Coord(fmt[start].get('l'), t, fmt[end].get('r'), b)
-        def find_coords(m):
-            return Coord(1,2,3,4)
+        def find_box(m):
+            return box(1,2,3,4)
 
         # look for roman numerals
         # fix some common OCR errors
@@ -130,11 +130,11 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('roman', num_str, i, index - i,
-                                       [(word, find_coords(m))])
-                                       # [(fmt, find_coords(m))])
+                                       [(word, find_box(m))])
+                                       # [(fmt, find_box(m))])
             else:
-                seen[num_str].coords.append((word, find_coords(m)))
-                # seen[num_str].coords.append((fmt, find_coords(m)))
+                seen[num_str].coords.append((word, find_box(m)))
+                # seen[num_str].coords.append((fmt, find_box(m)))
             yield seen[num_str]
 
         # look for arabic numerals
@@ -149,9 +149,9 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('arabic', num_str, i, index - i,
-                                       [(word, find_coords(m))])
-                                       # [(fmt, find_coords(m))])
+                                       [(word, find_box(m))])
+                                       # [(fmt, find_box(m))])
             else:
-                seen[num_str].coords.append((word, find_coords(m)))
-                # seen[num_str].coords.append((fmt, find_coords(m)))
+                seen[num_str].coords.append((word, find_box(m)))
+                # seen[num_str].coords.append((fmt, find_box(m)))
             yield seen[num_str]
