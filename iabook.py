@@ -13,6 +13,8 @@ import ImageDraw
 # import color
 # from color import color as c
 
+import font
+
 
 ns="{http://www.abbyy.com/FineReader_xml/FineReader6-schema-v1.xml}"
 class Book(object):
@@ -33,6 +35,11 @@ class Book(object):
             self.images_type = 'tif.zip'
         elif os.path.exists(os.path.join(book_path, self.doc + '_jp2.tar')):
             self.images_type = 'jp2.tar'
+        dpi = self.scandata.findtext('.//%sdpi' % self.scandata_ns)
+        if len(dpi) > 0:
+            self.dpi = int(dpi)
+        else:
+            self.dpi = 300
 
 
     def get_scandata_ns(self):
@@ -164,7 +171,12 @@ class Book(object):
                               kdu_reduce)
 
 
-class Box(namedtuple('Coord', 'l b r t')):
+class Coord(namedtuple('Coord', 'x y')):
+    def scale(self, factor):
+        return Coord(float(self.x) / factor, float(self.y) / factor)
+
+
+class Box(namedtuple('Box', 'l b r t')):
     def scale(self, factor):
         return Box(float(self.l) / factor, float(self.b) / factor,
                    float(self.r) / factor, float(self.t) / factor)
@@ -188,11 +200,13 @@ class abspage(object):
 
 
 class drawablepage(object):
-    def __init__(self, page, scale=2, reduce=2, savedir='.'):
+    def __init__(self, page, scale=2, reduce=2,
+                 savedir='.', namefmt='img%s.png'):
         self.page = page
         self.scale = scale
         self.reduce = reduce
         self.savedir = savedir
+        self.namefmt = namefmt
         orig_width = int(page.page.get('width'))
         orig_height = int(page.page.get('height'))
         requested_size = (orig_width / scale, orig_height / scale)
@@ -218,9 +232,12 @@ class drawablepage(object):
         self.draw.line([(box.l, box.t), (box.r, box.t),
                         (box.r, box.b), (box.l, box.b), (box.l, box.t)],
                        width=width) # xxx fill=color
+    def drawtext(self, text, coord, face='Courier', size=10):
+        coord = coord.scale(self.scale)
+        f = font.get_font(face, self.page.book.dpi / self.scale,size)
+        self.draw.text(coord, text, font=f) # fill=color.yellow
     def save(self):
-        filename = 'img%s.png' % self.page.scandata.get('leafNum').zfill(3)
-        # self.image.save('%s/%s' % (self.savedir, filename))
+        filename = self.namefmt % self.page.scandata.get('leafNum').zfill(3)
         self.image.save(os.path.join(self.savedir, filename))
 
 

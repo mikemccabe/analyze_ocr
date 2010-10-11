@@ -35,10 +35,11 @@ def main(args):
 def filter(pages):
     for page in pages:
         if page.index % 10 == 0:
-            drawable = page.get_drawable()
+            drawable = page.get_drawable(scale=3)
             for line in page.get_lines():
                 for word in line.get_words():
                     drawable.drawbox(word.box)
+                    drawable.drawtext(word.text, Coord(word.box.l, word.box.t))
             drawable.save()
         if page.scandata.findtext(scandata_ns + 'addToAccessFormats') == 'true':
             yield page
