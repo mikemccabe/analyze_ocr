@@ -110,7 +110,8 @@ def pageno_candidates(pageinfo, page, index):
         #         end = len(fmt) - 1
         #     return Coord(fmt[start].get('l'), t, fmt[end].get('r'), b)
         def find_box(m):
-            return box(1,2,3,4)
+            raise 'NYI'
+            # return box(1,2,3,4)
 
         # look for roman numerals
         # fix some common OCR errors
@@ -130,10 +131,12 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('roman', num_str, i, index - i,
-                                       [(word, find_box(m))])
+                                       # [(word, find_box(m))])
+                                       [(word, None)])
                                        # [(fmt, find_box(m))])
             else:
-                seen[num_str].coords.append((word, find_box(m)))
+                seen[num_str].coords.append((word, None))
+                # seen[num_str].coords.append((word, find_box(m)))
                 # seen[num_str].coords.append((fmt, find_box(m)))
             yield seen[num_str]
 
@@ -149,9 +152,11 @@ def pageno_candidates(pageinfo, page, index):
                 if i > index and i != 0:
                     continue
                 seen[num_str] = Pageno('arabic', num_str, i, index - i,
-                                       [(word, find_box(m))])
+                                       [(word, None)])
+                                       # [(word, find_box(m))])
                                        # [(fmt, find_box(m))])
             else:
-                seen[num_str].coords.append((word, find_box(m)))
+                seen[num_str].coords.append((word, None))
+                # seen[num_str].coords.append((word, find_box(m)))
                 # seen[num_str].coords.append((fmt, find_box(m)))
             yield seen[num_str]

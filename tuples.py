@@ -31,14 +31,14 @@ class Pageno(namedtuple('Pageno', 'type string value offset coords')):
         #          del self.info['hf_guesses'][i]
         #     del self.info['hf_guesses']
 
-class box(namedtuple('Coord', 'l t r b')):
-    pass
+# class box(namedtuple('Coord', 'l t r b')):
+#     pass
     # def findcenter(self):
     #     return (float(self.l) + (float(self.r) - float(self.l)) / 2,
     #             float(self.t) - (float(self.b) - float(self.t)) / 2)
 
-class Word(namedtuple('Word', 'text chars')):
-    pass
+# class Word(namedtuple('Word', 'text chars')):
+#     pass
     # def clear(self):
     #     for char in chars:
     #         char.clear()

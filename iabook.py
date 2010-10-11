@@ -164,8 +164,18 @@ class Book(object):
                               kdu_reduce)
 
 
-box = namedtuple('box', 'l t r b')
+class Box(namedtuple('Coord', 'l b r t')):
+    def scale(self, factor):
+        return Box(float(self.l) / factor, float(self.b) / factor,
+                   float(self.r) / factor, float(self.t) / factor)
 
+    # def findcenter(self):
+    #     return (float(self.l) + (float(self.r) - float(self.l)) / 2,
+    #             float(self.t) - (float(self.b) - float(self.t)) / 2)
+
+# Box = namedtuple('Box', 'l b r t')
+Word = namedtuple('Word', 'text box')
+Line = namedtuple('Line', 'lineno get_words')
 class abspage(object):
     def __init__(self, i, book, page, page_scandata):
         self.index = i
@@ -204,16 +214,14 @@ class drawablepage(object):
         self.image = image
         self.draw = ImageDraw.Draw(image)
     def drawbox(self, box, width=1): # xxx fill=
+        box = box.scale(self.scale)
         self.draw.line([(box.l, box.t), (box.r, box.t),
-                   (box.r, box.b), (box.l, box.b), (box.l, box.t)],
+                        (box.r, box.b), (box.l, box.b), (box.l, box.t)],
                        width=width) # xxx fill=color
     def save(self):
         filename = 'img%s.png' % self.page.scandata.get('leafNum').zfill(3)
         # self.image.save('%s/%s' % (self.savedir, filename))
         self.image.save(os.path.join(self.savedir, filename))
-    def clear(self):
-        self.image.clear()
-        self.draw.clear()
 
 
 
@@ -223,7 +231,6 @@ class djvupage(abspage):
         for line in lines:
             words = line.findall('.//WORD')
             for word in words:
-                # sometimes 4 coords, sometimes 5
                 l, b, r, t = word.get('coords').split(',')[:4]
                 # if (int(b) - int(t)) < 50:
                 #     continue
@@ -233,6 +240,21 @@ class djvupage(abspage):
                 text.strip()
                 if len(text) > 0:
                     yield text.lower().encode('ascii', 'ignore')
+    def get_lines(self):
+        for i, line in enumerate(self.page.findall('.//LINE')):
+            def words_from_line():
+                words = line.findall('.//WORD')
+                for word in words:
+                    # djvu: sometimes 4 coords, sometimes 5 - strip last
+                    l, b, r, t = word.get('coords').split(',')[:4]
+                    box = Box(int(l), int(b), int(r), int(t))
+                    text = word.text
+                    # l b r t
+                    text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
+                    text = text.lower().encode('ascii', 'ignore').strip()
+                    if len(text) > 0:
+                        yield Word(text, box)
+            yield Line(i, words_from_line)
     def find_text_bounds(self):
         l = t = sys.maxint
         r = b = 0
@@ -255,7 +277,7 @@ class djvupage(abspage):
             t = 0
             r = int(self.page.get('width'))
             b = int(self.page.get('height'))
-        return box(l, t, r, b)
+        return Box(l, b, r, t)
     def clear(self):
         self.page.clear()
         self.page = None
@@ -311,7 +333,7 @@ class abbyypage(abspage):
             t = 0
             r = int(self.page.get('width'))
             b = int(self.page.get('height'))
-        return box(l, t, r, b)
+        return box(l, b, r, t)
     def clear(self):
         self.page.clear()
         self.page = None

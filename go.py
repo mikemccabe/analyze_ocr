@@ -27,16 +27,18 @@ def main(args):
         page.clear()
     windowed_pages = windowed_iterator(pages, 5, clear_page)
     pages = analyze(windowed_pages)
-    toc = make_toc.make_toc(iabook, pages)
-    print json.dumps(toc, indent=4)
-    # consume(pages)
+    # toc = make_toc.make_toc(iabook, pages)
+    # print json.dumps(toc, indent=4)
+    consume(pages)
 
 
 def filter(pages):
     for page in pages:
         if page.index % 10 == 0:
             drawable = page.get_drawable()
-            drawable.drawbox(box(20, 20, 60, 60))
+            for line in page.get_lines():
+                for word in line.get_words():
+                    drawable.drawbox(word.box)
             drawable.save()
         if page.scandata.findtext(scandata_ns + 'addToAccessFormats') == 'true':
             yield page
