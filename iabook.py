@@ -197,6 +197,12 @@ class abspage(object):
         self.info = {}
     def get_drawable(self, scale=2, reduce=2, savedir='.'):
         return drawablepage(self, scale, reduce, savedir)
+    def draw_basics(self, drawable):
+        for line in self.get_lines():
+            for word in line.get_words():
+                drawable.drawbox(word.box)
+                drawable.drawtext(word.text, Coord(word.box.l, word.box.t))
+
 
 
 class drawablepage(object):
@@ -222,7 +228,7 @@ class drawablepage(object):
             if requested_size != page_image.size:
                 page_image = page_image.resize(requested_size)
             try:
-                image = Image.blend(image, page_image, .3)
+                image = Image.blend(image, page_image, 0.2)
             except ValueError:
                 raise 'blending - images didn\'t match'
         self.image = image
@@ -358,7 +364,6 @@ class abbyypage(abspage):
 
 def nsify(tagpath, ns) :
     return '/'.join(ns + tag for tag in tagpath)
-
 
 
 def get_kdu_region_string(img_size, region):
