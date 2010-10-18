@@ -7,19 +7,53 @@ from interval import Interval, IntervalSet
 from collections import namedtuple
 
 
+from windowed_iterator import windowed_iterator
+
 def l(s):
     sys.stderr.write(str(s) + '\n')
 
-class pagenocand(namedtuple('pagenocand', 'numtype val word_index')):
+class pagenocand(namedtuple('pagenocand', 'numtype page_index val word_index')):
     pass
+
+
+def check_toc(toc):
+    # reject if:
+    # - any title is too long.
+    # - page numbers aren't monotonic
+    # - some entries have pageno w/o title/label
+    # - if toc pages skip
+    # - if a toc item contains numbers?
+    if len(toc) < 4:
+        return False
+    prevno = 0
+    prevtocpage = toc[0]['tocpage']
+    for ti in toc:
+        if len(ti['title']) > 60:
+            return False
+        if len(ti['title'].strip()) == 0 and len(ti['label'].strip()) == 0:
+            return False
+        if int(ti['pagenum']) < prevno:
+            return False
+        prevno = int(ti['pagenum'])
+        if ti['tocpage'] > prevtocpage + 1:
+            return False
+        prevtocpage = ti['tocpage']
+    return True
+
+
+
+
+
 
 def make_toc(iabook, pages):
     contentscount = iabook.get_contents_count()
+
     # contentscount = 0
 
     skipfirst = 0
-    n = 13
-    max_assumed_toc = 10
+    n = 5 # XXX should be higher?
+    max_assumed_toc = 2
+    # max_assumed_toc = 1
     n_optimistic = max_assumed_toc
     tcs = []
     thresh = 5 # if some tc page goes above this score, then...
@@ -42,8 +76,8 @@ def make_toc(iabook, pages):
             continue
         if page.index < skipfirst:
             continue
-        l("%s: %s %s" % (page.index, page.info['number'],
-                             page.info['type']))
+        # l("%s: %s %s" % (page.index, page.info['number'],
+        #                      page.info['type']))
         wipetil = 0
         score = 0
         for i, tc in enumerate(tcs):
@@ -51,7 +85,6 @@ def make_toc(iabook, pages):
                 continue
             if i > endtoc:
                 continue
-            l('MATCH WITH TC PAGE %s' % i)
             tc.match_page(page)
             if tc.score > thresh:
                 starttoc = i
@@ -67,10 +100,14 @@ def make_toc(iabook, pages):
             or (contentscount > 1 and len(tcs) < contentscount
                 and page.info['type'] == 'contents')):
                 tcs.append(TocCandidate(page))
+                # if True:
+                #     break
     # for tc in tcs:
     #     tc.printme()
+    qdresult = []
+    all_pageno_cands = []
     result = []
-    for tc in tcs:
+    for i, tc in enumerate(tcs):
         if tc.score > thresh:
             for match in tc.matches:
                 info = tc.matchinfo[match]
@@ -80,22 +117,44 @@ def make_toc(iabook, pages):
                     pagenum = tc.words[pagenum]
                 labelwords, titlewords = guess_label(tocitem_words)
                 result.append({'level':1, 'label':(' '.join(labelwords)).strip(),
-                               'title':(' '.join(titlewords)).strip(), 'pagenum':pagenum})
-    return result
+                               'title':(' '.join(titlewords)).strip(), 'pagenum':pagenum,
+                               'tocpage':i
+                               })
+            if i == 0:
+                all_pageno_cands += tc.pageno_cands
+            else:
+                all_pageno_cands += tc.pageno_cands_unfiltered
+                # all_pageno_cands += tc.pageno_cands
 
+            # qdresult += tc.get_qdtoc()
+    if len(all_pageno_cands) > 0:
+        all_pageno_cands_f = extract_sorted(all_pageno_cands)
+        # print all_pageno_cands
+    for i, tc in enumerate(tcs):
+        if tc.score > thresh:
+            qdresult += tc.get_qdtoc(all_pageno_cands_f)
+
+    return result, qdresult
 
 
 labels = ('chapter', 'part', 'section', 'book',
 #              'preface', 'appendix', 'footnotes'
           )
+numbers = ('one', 'two', 'three', 'four', 'five',
+           'six', 'seven', 'eight', 'nine', 'ten',
+           'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+           'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty',
+           )
 def guess_label(words):
     labelwords = []
     if len(words) > 1:
         if words[0].lower() in labels:
             labelwords.append(words.pop(0))
             if len(words) > 1 and (words[0].isdigit()
-                                   or rnum_to_int(words[0]) != 0):
+                                   or rnum_to_int(words[0]) != 0
+                                   or words[0] in numbers):
                 labelwords.append(words.pop(0))
+    # XXX could put guess at '4 oysters 45' here (get 4)
     return labelwords, words
 
 
@@ -148,19 +207,23 @@ class TocCandidate(object):
         self.matcher = SequenceMatcher()
         self.words = [word for word in page.get_words()]
         for i in range(4):
-            if i < len(self.words):
-                if self.words[i] == 'contents':
-                    self.words[i] = ''
-                if self.words[i] == 'page':
-                    self.words[i] = ''
+            if i >= len(self.words):
+                break
+            # if i < len(self.words):
+            #     self.words.pop(i)
+            if self.words[i] == 'contents':
+                self.words[i] = ''
+            if self.words[i] == 'page':
+                self.words[i] = ''
         self.wordhash = {}
         for word in self.words:
             self.wordhash[word] = True
         self.matcher.set_seq2(self.words)
-        l('\n'.join('%s:%s' % (i, w) for i, w in enumerate(self.words)))
-        l('content len: %s' % len(self.words))
+        # l('\n'.join('%s:%s' % (i, w) for i, w in enumerate(self.words)))
+        # l('content len: %s' % len(self.words))
         self.lookaside = {}
-        self.pageno_candidates = self.find_pageno_candidates(page)
+        self.pageno_cands = self.find_pageno_cands(page, filtered=True)
+        self.pageno_cands_unfiltered = self.find_pageno_cands(page, filtered=False)
         self.matches = IntervalSet()
         self.matchinfo = {}
         self.score = 0
@@ -179,8 +242,19 @@ class TocCandidate(object):
         # note that current next, prev is from *end* of match
         left = None
         right = None
-        for right in self.pageno_candidates:
 
+        # def cands():
+        #     for c in self.pageno_cands:
+        #         yield c
+
+        # windowed_nearnos = windowed_iterator(cands(), 4)
+        # for right in windowed_nearnos:
+        #     if match.b + match.size - 1 < right.word_index:
+        #         break;
+        #     left = right
+        #     return windowed_nearnos.neighbors()
+
+        for right in self.pageno_cands:
             if match.b + match.size - 1 < right.word_index:
                 break;
             left = right
@@ -188,9 +262,9 @@ class TocCandidate(object):
 
 
     def add_match(self, page, match):
-        l('ADDING ' + str(match))
+        # l('ADDING ' + str(match))
         info = RangeMatch(self, page, match)
-        l(info)
+        # l(info)
         pageno = page.info['number']
         pagenoval = rnum_to_int(pageno)
         if pagenoval == 0 and len(pageno) > 0:
@@ -204,13 +278,17 @@ class TocCandidate(object):
         # if nearnos matches either, mark flag and amp score
         if pageno:
             nearnos = self.find_nearnos(match)
-            l("GREPME near is [%s] pagenoval %s" % (nearnos, pagenoval))
+            # l("GREPME near is [%s] pagenoval %s" % (nearnos, pagenoval))
+            # for no in nearnos[1], nearnos[0]:
+            if nearnos is None: # XXX SHOULDN"T BE NEEDED!!!!!!!!!!!!
+                nearnos = []
             for no in nearnos[1], nearnos[0]:
+            # for no in nearnos:
                 if no is not None:
-                    l(no.val)
+                    # l(no.val)
                     if no.val == pagenoval:
                         info.notes += 'nearno: %s' % pageno
-                        l("GOODMATCH tc %s, %s %s" % (self.page.index, pageno, self.score))
+                        # l("GOODMATCH tc %s, %s %s" % (self.page.index, pageno, self.score))
                         self.score += 1
                         info.nearno = no.word_index
                         break
@@ -262,16 +340,14 @@ class TocCandidate(object):
         #     info = self.matchinfo[ival]
         #     print "%s %s" % (ival, info)
 
-
         # overlap
-
 
         # for existing_match in self.matches:
 
         # --> get array of matching stuff in matches.
         # existing_matches = IntervalSet([matchint]) &
 
-    def find_pageno_candidates(self, page):
+    def find_pageno_cands(self, page, filtered=True):
         """ Find the set of all numbers on this page that don't
         e.g. follow 'chapter', then find the largest increasing subset
         of these numbers; we consider it likely that these'll be book
@@ -286,38 +362,77 @@ class TocCandidate(object):
                     continue
                 r = rnum_to_int(word)
                 # print word.encode('utf-8')
-                if r != 0:
-                    yield pagenocand('0roman', r, i)
+                # if r != 0:
+                #     yield pagenocand('0roman', page.index, r, i)
                 if word.isdigit():
                     val = int(word)
                     if val < 999:
                         # XXX replace above check with book page count
                         # if avail.
-                        yield pagenocand('1arabic', int(word), i)
+                        yield pagenocand('1arabic', page.index, int(word), i)
                 lastword = word
         def printword(c):
             ar, val, loc = c
             print "%s %s - %s" % (ar, val, self.words[loc])
         page_cands = [c for c in get_page_cands(page)]
-        #
-        # print 'cands'
-        # for c in page_cands:
-        #     printword(c)
-        # print page_cands
-        #
+
         result = page_cands
-        # if len(page_cands) != 0:
-        #     result = extract_sorted(page_cands)
-        # print 'page_nums'
-        # for c in result:
-        #     printword(c)
+        # print page_cands
+
+        if filtered and len(page_cands) > 0:
+            extracted_orig = extract_sorted(page_cands)
+            result = extracted_orig
+
+        # less_greedy_heuristic = False
+        less_greedy_heuristic = True
+        # try to guess at the situation where we've grabbed a compact
+        # sequence of number that aren't pagenos - common case is
+        # chapter numbers.  If first numbers are closely spaced, and
+        # skipping them still gives a reasonable (different) sequence,
+        # go ahead and skip them.
+        if filtered and less_greedy_heuristic:
+            if len(page_cands) != 0:
+                # import pdb; pdb.set_trace()
+                slop = 1
+                if (len(extracted_orig) > 3
+                    and extracted_orig[0].val + 2 >= extracted_orig[1].val
+                    and extracted_orig[1].val + 2 >= extracted_orig[2].val):
+                    page_cands_filtered = []
+                    for c in page_cands:
+                        if c != extracted_orig[1] and c != extracted_orig[2]:
+                            page_cands_filtered.append(c)
+                    extracted_filtered = extract_sorted(page_cands_filtered)
+                    # did we just lose a pair we wanted?
+                    # see if extracted_filtered is the same, but for the missing two
+                    unchanged_sort = False
+                    if (len(extracted_filtered) + 2 == len(extracted_orig)
+                        and extracted_filtered[0] == extracted_orig[0]):
+                        i = 1
+                        while i < len(extracted_orig) - 2:
+                            if extracted_filtered[i] != extracted_orig[i + 2]:
+                                break
+                            i += 1
+                        unchanged_sort = True
+                    if (unchanged_sort
+                        or len(extracted_orig) + 4 < len(extracted_filtered)):
+                        # too much loss, go with orig
+                        result = extracted_orig
+                    else:
+                        result = extracted_filtered
+                        # print extracted_filtered
+                    # result = extracted_filtered
+                    # print extracted_filtered
         return result
 
     def match_page(self, page):
+        # for line in page.get_lines():
+        #     print '%s %s %s' % ('FIRSTLINE', page.index, ' '.join(w.text for w in line.get_words()))
+        #     break
         words = [word for word in page.get_words()][:30]
         # print ' '.join(words).encode('utf-8')
         for i, word in enumerate(words):
             words[i] = self.reify(word)
+        # print words
         self.matcher.set_seq1(words)
         page_matches = self.matcher.get_matching_blocks()
         page_matches.pop() # lose trailing non-match
@@ -350,12 +465,42 @@ class TocCandidate(object):
             return word
         if word in self.lookaside:
             return self.lookaside[word]
-        candidates = get_close_matches(word, self.words, n=1, cutoff=.9)
-        if len(candidates) > 0:
-            candidate = candidates[0]
+        cands = get_close_matches(word, self.words, n=1, cutoff=.9)
+        if len(cands) > 0:
+            candidate = cands[0]
             # print "%s --> %s" % (word.encode('utf-8'), candidate.encode('utf-8'))
             self.lookaside[word] = candidate
             return candidate
         self.lookaside[word] = word
         return word
 
+    def get_qdtoc(self, all_pageno_cands):
+        # pobj = abbyypage(page)
+        valid_pages = {}
+        for c in all_pageno_cands:
+            if c.page_index == self.page.index:
+                valid_pages[c.word_index] = c
+        # for c in self.pageno_cands:
+        #     valid_pages[c.word_index] = c
+        # print valid_pages
+        words_so_far = []
+        firstword = True
+        prev_word = ''
+        result = []
+        for i, word in enumerate(self.words):
+            if firstword:
+                if word.lower() == 'contents':
+                    prev_word = word
+                    continue
+                firstword = False
+            if i in valid_pages:
+                labelwords, titlewords = guess_label(words_so_far)
+                result.append({'level':1, 'label':(' '.join(labelwords)).strip(),
+                               'title':(' '.join(titlewords)).strip(), 'pagenum':word,
+                               'tocpage':self.page.index
+                               })
+                words_so_far = []
+            else:
+                words_so_far.append(word)
+            prev_word = word
+        return result
