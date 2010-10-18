@@ -20,8 +20,6 @@ def main(args):
     elif len(args) == 3:
         (item_id, doc, path) = args
     else:
-        print len(args)
-        print args
         (book_id,) = args
         path = book_id
 
@@ -43,29 +41,32 @@ def main(args):
     if not make_toc.check_toc(qdtoc):
         qdtoc = []
 
-    # print '\n'.join(str(ti) for ti in toc)
-    # print
-    # print '\n'.join(str(ti) for ti in qdtoc)
-    if callback is not None:
-        print '%s(' % callback
-    print_one_per_line(qdtoc)
-    if callback is not None:
-        print ')'
+    print_readable(qdtoc)
+
+    # if callback is not None:
+    #     print '%s(' % callback
+    # print_one_per_line(qdtoc)
+    # if callback is not None:
+    #     print ')'
+
     # consume(pages)
 
 
-def print_one_per_line(a):
+def print_readable(a):
     def printel(el):
-        return '%s %s -%s- %s' % (el['tocpage'],
+        return '%s  %s  %s %s' % (el['tocpage'],
                                   el['pagenum'].rjust(3),
-                                  el['label'],
+                                  el['label'].ljust(15),
                                   el['title'])
     print '\n'.join(printel(el) for el in a)
-    # print '['
-    # print ',\n'.join(json.dumps(el) for el in a)
-    # # for el in a:
-    # #     print json.dumps(el) + ','
-    # print ']'
+
+
+def print_one_per_line(a):
+    print '['
+    print ',\n'.join(json.dumps(el) for el in a)
+    # for el in a:
+    #     print json.dumps(el) + ','
+    print ']'
 
 
 
