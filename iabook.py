@@ -7,13 +7,10 @@ import gzip
 import re
 from collections import namedtuple
 
-import Image
-import ImageDraw
 # import ImageFont
 # import color
 # from color import color as c
 
-import font
 
 
 ns="{http://www.abbyy.com/FineReader_xml/FineReader6-schema-v1.xml}"
@@ -36,7 +33,7 @@ class Book(object):
         elif os.path.exists(os.path.join(book_path, self.doc + '_jp2.tar')):
             self.images_type = 'jp2.tar'
         dpi = self.scandata.findtext('.//%sdpi' % self.scandata_ns)
-        if len(dpi) > 0:
+        if dpi is not None and len(dpi) > 0:
             self.dpi = int(dpi)
         else:
             self.dpi = 300
@@ -208,6 +205,9 @@ class abspage(object):
 class drawablepage(object):
     def __init__(self, page, scale=2, reduce=2,
                  savedir='.', namefmt='img%s.png'):
+        import Image
+        import ImageDraw
+
         self.page = page
         self.scale = scale
         self.reduce = reduce
@@ -239,6 +239,7 @@ class drawablepage(object):
                         (box.r, box.b), (box.l, box.b), (box.l, box.t)],
                        width=width) # xxx fill=color
     def drawtext(self, text, coord, face='Courier', size=10):
+        import font
         coord = coord.scale(self.scale)
         f = font.get_font(face, self.page.book.dpi / self.scale,size)
         self.draw.text(coord, text, font=f) # fill=color.yellow
