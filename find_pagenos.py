@@ -101,7 +101,7 @@ def pageno_candidates(pageinfo, page, index):
         #                           method='text',
         #                           encoding=unicode).lower();
     for word in pageinfo.get_words():
-        fmt_text = word
+        fmt_text = word.text
 
         # def find_box(m):
         #     # l t r b
