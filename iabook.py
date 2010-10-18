@@ -183,7 +183,7 @@ class Box(namedtuple('Box', 'l b r t')):
     #             float(self.t) - (float(self.b) - float(self.t)) / 2)
 
 # Box = namedtuple('Box', 'l b r t')
-Word = namedtuple('Word', 'text box')
+Word = namedtuple('Word', 'text box index')
 Line = namedtuple('Line', 'lineno get_words')
 class abspage(object):
     def __init__(self, i, book, page, page_scandata):
@@ -248,22 +248,37 @@ class drawablepage(object):
         self.image.save(os.path.join(self.savedir, filename))
 
 
-
 class djvupage(abspage):
     def get_words(self):
         lines = self.page.findall('.//LINE')
+        index = 0
         for line in lines:
             words = line.findall('.//WORD')
             for word in words:
-                l, b, r, t = word.get('coords').split(',')[:4]
-                # if (int(b) - int(t)) < 50:
-                #     continue
+                index += 1
                 text = word.text
-                # l b r t
                 text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
                 text.strip()
                 if len(text) > 0:
-                    yield text.lower().encode('ascii', 'ignore')
+                    l, b, r, t = word.get('coords').split(',')[:4]
+                    yield Word(text.lower().encode('ascii', 'ignore'),
+                               Box(int(l), int(b), int(r), int(t)),
+                               index)
+    def get_words_raw(self):
+        lines = self.page.findall('.//LINE')
+        index = 0
+        for line in lines:
+            words = line.findall('.//WORD')
+            for word in words:
+                index += 1
+                text = word.text
+                # text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
+                text.strip()
+                if len(text) > 0:
+                    l, b, r, t = word.get('coords').split(',')[:4]
+                    yield Word(text.encode(unicode, 'ignore'),
+                               Box(int(l), int(b), int(r), int(t)),
+                               index)
     def get_lines(self):
         for i, line in enumerate(self.page.findall('.//LINE')):
             def words_from_line():
@@ -273,7 +288,6 @@ class djvupage(abspage):
                     l, b, r, t = word.get('coords').split(',')[:4]
                     box = Box(int(l), int(b), int(r), int(t))
                     text = word.text
-                    # l b r t
                     text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
                     text = text.lower().encode('ascii', 'ignore').strip()
                     if len(text) > 0:
