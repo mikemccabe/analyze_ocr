@@ -6,13 +6,26 @@ import find_pagenos
 import make_toc
 import json
 
+opts = None
+
 djvu = True
 # djvu = False
-pagenos = True
+pagenos = False
 hfs = False
 
 scandata_ns = ''
-def main(args):
+def main(argv):
+    import optparse
+    parser = optparse.OptionParser(usage='usage: %prog [options]',
+                                   version='%prog 0.1',
+                                   description='make tocs')
+    parser.add_option('--human',
+                      action='store_true',
+                      default=False,
+                      help='print some human-readable stuff')
+    global opts
+    opts, args = parser.parse_args(argv)
+
     doc = ''
     callback = None
     if len(args) == 4:
@@ -37,28 +50,44 @@ def main(args):
         page.clear()
     windowed_pages = windowed_iterator(pages, 5, clear_page)
     pages = analyze(windowed_pages)
-    toc, qdtoc = make_toc.make_toc(iabook, pages)
-    if not make_toc.check_toc(qdtoc):
-        qdtoc = []
+    toc_result = make_toc.make_toc(iabook, pages)
 
-    print_readable(qdtoc)
+    toc_result['readable'] = print_readable(toc_result['qdtoc'])
 
-    # if callback is not None:
-    #     print '%s(' % callback
-    # print_one_per_line(qdtoc)
-    # if callback is not None:
-    #     print ')'
+    if opts.human:
+        for r in ('readable', 'comments', 'isok'):
+            print r + ':'
+            print toc_result[r]
+            print
+    else:
+        if callback is not None:
+            print '%s(' % callback
+            print json.dumps(toc_result)
+            # print_one_per_line(qdtoc)
+        if callback is not None:
+            print ')'
+        else:
+            print json.dumps(toc_result, indent=4)
+
 
     # consume(pages)
 
 
 def print_readable(a):
+    maxllen = 0
+    maxtlen = 0
+    for el in a:
+        if len(el['title']) > maxtlen:
+            maxtlen = len(el['title'])
+        if len(el['label']) > maxllen:
+            maxllen = len(el['label'])
+    
     def printel(el):
         return '%s  %s  %s %s' % (el['tocpage'],
-                                  el['pagenum'].rjust(3),
-                                  el['label'].ljust(15),
-                                  el['title'])
-    print '\n'.join(printel(el) for el in a)
+                                  el['label'].ljust(maxllen + 3),
+                                  el['title'].ljust(maxtlen + 3),
+                                  el['pagenum'].rjust(3))
+    return '\n'.join(printel(el) for el in a)
 
 
 def print_one_per_line(a):
