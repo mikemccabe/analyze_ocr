@@ -43,5 +43,5 @@ class Pageno(namedtuple('Pageno', 'type string value offset coords')):
     #     for char in chars:
     #         char.clear()
 
-class pagenocand(namedtuple('pagenocand', 'numtype val word_index')):
-    pass
+# class pagenocand(namedtuple('pagenocand', 'numtype val word_index')):
+#     pass
