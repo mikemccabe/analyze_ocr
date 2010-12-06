@@ -25,13 +25,25 @@ class Book(object):
             raise Exception('Can\'t find book path "' + book_path + '"')
         self.scandata = self.get_scandata()
         self.scandata_ns = self.get_scandata_ns()
-        self.images_type = 'unknown'
-        if os.path.exists(os.path.join(book_path, self.doc + '_jp2.zip')):
-            self.images_type = 'jp2.zip'
-        elif os.path.exists(os.path.join(book_path, self.doc + '_tif.zip')):
-            self.images_type = 'tif.zip'
-        elif os.path.exists(os.path.join(book_path, self.doc + '_jp2.tar')):
-            self.images_type = 'jp2.tar'
+
+        self.imgstack_archive_fmt = None
+        self.imgstack_image_fmt = None
+        imgstack_types = (('jp2', 'zip'),
+                          ('tif', 'zip'),
+                          ('jp2', 'tar'),
+                          ('jpg', 'zip'))
+        for imgstack_t in imgstack_types:
+            imgstack_path = os.path.join(book_path, '%s_%s.%s' %
+                                         (self.doc,
+                                          imgstack_t[0], imgstack_t[1]))
+            if os.path.exists(imgstack_path):
+                self.imgstack_image_fmt = imgstack_t[0]
+                self.imgstack_archive_fmt = imgstack_t[1]
+                self.imgstack_name = imgstack_path
+                break
+        if self.imgstack_archive_fmt is None:
+            raise Exception('Can\'t find book images')
+
         dpi = self.scandata.findtext('.//%sdpi' % self.scandata_ns)
         if dpi is not None and len(dpi) > 0:
             self.dpi = int(dpi)
@@ -115,6 +127,12 @@ class Book(object):
                     if e.text.lower() == 'contents'])
 
 
+    def has_pagenos(self):
+        for pn in self.scandata.findall('.//%spageNumber' % (self.scandata_ns)):
+            if pn.text is not None and len(pn.text) > 0:
+                return True
+
+
     def get_pages_as_abbyy(self):
         abbyy = self.get_abbyy()
         scandata_iter = self.get_scandata_pages()
@@ -138,29 +156,22 @@ class Book(object):
                        out_img_type='jpg',
                        kdu_reduce=2):
         doc_basename = os.path.basename(self.doc)
-        if self.images_type == 'jp2.zip':
-            zipf = os.path.join(self.book_path,
-                                self.doc + '_jp2.zip')
-            image_path = (doc_basename + '_jp2/' + doc_basename + '_'
-                          + leafno.zfill(4) + '.jp2')
-            in_img_type = 'jp2'
-        elif self.images_type == 'tif.zip':
-            zipf  = os.path.join(self.book_path,
-                                 self.doc + '_tif.zip')
-            image_path = (doc_basename + '_tif/' + doc_basename + '_'
-                          + leafno.zfill(4) + '.tif')
-            in_img_type = 'tif'
-        elif self.images_type == 'jp2.tar':
-            # 7z e archive.tar dir/filename.jp2 <---- fast!
-            raise 'NYI'
-        else:
-            return None
+
+        zipf = self.imgstack_name
+        image_path = '%s_%s/%s_%s.%s' % (doc_basename, self.imgstack_image_fmt,
+                                         doc_basename, str(leafno).zfill(4),
+                                         self.imgstack_image_fmt)
+        in_img_type = self.imgstack_image_fmt
+        
         try:
-            z = zipfile.ZipFile(zipf, 'r')
-            info = z.getinfo(image_path) # for to check it exists
-            z.close()
+            if self.imgstack_archive_fmt == 'zip':
+                z = zipfile.ZipFile(zipf, 'r')
+                info = z.getinfo(image_path) # for to check it exists
+                z.close()
+            # XXX extend above to work with tar?  or push into image_from_zip?
         except KeyError:
             return None
+
         return image_from_zip(zipf, image_path,
                               requested_size, orig_page_size,
                               quality, region,
@@ -259,8 +270,11 @@ class djvupage(abspage):
                 text = word.text
                 text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
                 text.strip()
-                if len(text) > 0:
+                if True or len(text) > 0:
                     l, b, r, t = word.get('coords').split(',')[:4]
+                    # yield Word(text.encode('utf-8', 'ignore'),
+                    #            Box(int(l), int(b), int(r), int(t)),
+                    #            index)
                     yield Word(text.lower().encode('ascii', 'ignore'),
                                Box(int(l), int(b), int(r), int(t)),
                                index)
@@ -273,10 +287,11 @@ class djvupage(abspage):
                 index += 1
                 text = word.text
                 # text = re.sub(r'[\s.:,\(\)\/;!\'\"\-]', '', text)
+                text = re.sub(r'[.]$', '', text)
                 text.strip()
-                if len(text) > 0:
+                if True or len(text) > 0:
                     l, b, r, t = word.get('coords').split(',')[:4]
-                    yield Word(text.encode(unicode, 'ignore'),
+                    yield Word(text.encode('utf-8', 'ignore'),
                                Box(int(l), int(b), int(r), int(t)),
                                index)
     def get_lines(self):
@@ -405,6 +420,7 @@ def image_from_zip(zipf, image_path,
                    quality, region,
                    in_img_type, out_img_type,
                    kdu_reduce):
+    clean_me_up = None
     if not os.path.exists(zipf):
         raise Exception('Zipfile missing')
 
@@ -417,33 +433,47 @@ def image_from_zip(zipf, image_path,
         cvt_to_out = ' | ppmtoppm -quiet'
     else:
         raise Exception('unrecognized out img type')
+
+    if zipf.endswith('.tar'):
+        unzip_cmd = '7z e -so ' + zipf + ' ' + image_path + ' 2>/dev/null'
+    else:
+        unzip_cmd = 'unzip -p ' + zipf + ' ' + image_path
+
     if in_img_type == 'jp2':
         kdu_region = get_kdu_region_string(orig_page_size, region)
-        output = os.popen('unzip -p ' + zipf + ' ' + image_path
+
+        output = os.popen(unzip_cmd
                         + ' | kdu_expand -region "' + kdu_region + '"'
                         +   ' -reduce ' + str(kdu_reduce)
                         +   ' -no_seek -i /dev/stdin -o /tmp/stdout.bmp'
                         + ' | bmptopnm -quiet '
                         + scale
                         + cvt_to_out)
-    elif in_img_type == 'tif':
+    elif in_img_type == 'tif' or in_img_type == 'jpg':
         crop = ''
         if region is not None:
             (l, t), (r, b) = region
-            l = str(l); t = str(t); r = str(r); b = str(b)
-            crop = (' | pamcut -left=' + l + ' -top=' + t
-                    + ' -right=' + r + ' -bottom=' + b)
+            crop = (' | pamcut -pad -left=%s -top=%s -right=%s -bottom=%s ' %
+                    (l, t, r, b))
 
         import tempfile
-        t_handle, t_path = tempfile.mkstemp()
+        tmp_suffix = '.%s' % in_img_type
+        _, t_path = tempfile.mkstemp(prefix='img_for_epub_', suffix=tmp_suffix)
+        clean_me_up = t_path
         output = os.popen('unzip -p ' + zipf + ' ' + image_path
                         + ' > ' + t_path)
         output.read()
-        output = os.popen('tifftopnm -quiet ' + t_path
+        to_pnm = { 'tif': 'tifftopnm',
+                   'jpg': 'jpegtopnm' }
+        output = os.popen(to_pnm[in_img_type] + ' -quiet ' + t_path
                         + crop
                         + scale
                         + cvt_to_out)
 
     else:
         raise Exception('unrecognized in img type')
-    return output.read()
+    try:
+        return output.read()
+    finally:
+        if clean_me_up is not None:
+            os.unlink(clean_me_up)
