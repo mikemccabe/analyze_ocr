@@ -54,9 +54,7 @@ $item_id = escapeshellarg($item_id);
 $doc = escapeshellarg($doc);
 $path = escapeshellarg($path);
 
-#print("item_id $item_id   doc $doc   path $path   callback $callback);
-
-passthru("python analyze_ocr.py $human $item_id $doc $path $callback 2>&1");
+passthru("python analyze_ocr.py $human $item_id $doc $path $callback");
 
 #print('hello world');
 #exec("python analyze_ocr.py $item_id $doc $path $callback 2>&1", $out, $retval);
