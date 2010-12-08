@@ -1,3 +1,6 @@
+
+# from http://pypi.python.org/pypi/interval/1.0.0
+
 """Provides the Interval and IntervalSet classes
 
 The interval module provides the Interval and IntervalSet data types.   
