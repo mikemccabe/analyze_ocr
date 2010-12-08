@@ -1,0 +1,6 @@
+Some code for analyzing OCR'ed documents.  It's currently pretty
+specific to Internet Archive OCR'd books, but it may be generalizable.
+
+Entry point: analyze_ocr.py - run this against an archive scanned book.
+
+Functionality: find headers/footers, page numbers, tables of contents.
