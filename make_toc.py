@@ -56,18 +56,19 @@ def make_toc(iabook, pages):
         result['has_contents'] = False
     if not iabook.has_pagenos():
         result['has_pagenos'] = False
-    # import pdb; pdb.set_trace()
-    # if (contentscount == 0
-    #     or not iabook.has_pagenos()):
-    #     result['failedbkno'] = 'nope'
-    #     failit(result, 'failed bc no pagenos or no contents page marked')
-    #     return result
 
     if not iabook.has_pagenos():
         result['failedbkno'] = 'nope'
-        failit(result, 'failed bc no pagenos or no contents page marked')
+        failit(result, 'failed bc no pagenos marked')
         return result
         
+
+    # if contentscount == 0:
+    #     result['failedbkno'] = 'nope'
+    #     failit(result, 'failed bc no contents page marked')
+    #     return result
+
+
     # XXX formalize all this goo somehow, and use
     # scandata pagetype better - e.g. no contents bf title
     # still needs formaized!
