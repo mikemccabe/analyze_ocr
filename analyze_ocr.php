@@ -30,7 +30,7 @@ $human=$_GET['human'];
 if (!$callback) {
     $callback = "";
 }
-if (!human) {
+if ($human) {
     $human = "--human";
 }
 
@@ -54,7 +54,8 @@ $item_id = escapeshellarg($item_id);
 $doc = escapeshellarg($doc);
 $path = escapeshellarg($path);
 
-passthru("python analyze_ocr.py $human $item_id $doc $path $callback");
+# passthru("python analyze_ocr.py $human $item_id $doc $path $callback");
+passthru("python analyze_ocr.py $human $item_id $doc $path $callback 2>&1");
 
 #print('hello world');
 #exec("python analyze_ocr.py $item_id $doc $path $callback 2>&1", $out, $retval);
