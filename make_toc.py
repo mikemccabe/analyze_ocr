@@ -57,11 +57,10 @@ def make_toc(iabook, pages):
     if not iabook.has_pagenos():
         result['has_pagenos'] = False
 
-    if not iabook.has_pagenos():
-        result['failedbkno'] = 'nope'
-        failit(result, 'failed bc no pagenos marked')
-        return result
-        
+    # if not iabook.has_pagenos():
+    #     result['failedbkno'] = 'nope'
+    #     failit(result, 'failed bc no pagenos marked')
+    #     return result
 
     # if contentscount == 0:
     #     result['failedbkno'] = 'nope'
