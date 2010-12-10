@@ -7,8 +7,11 @@ from tuples import *
 ns = '{http://www.abbyy.com/FineReader_xml/FineReader6-schema-v1.xml}'
 
 def guess_best_pageno(pageinfo, pages, window=None):
-    """ Select the best candidate pagenumber for the given page,
-    with reference to neighboring pages.
+    """ Select the best candidate pagenumber for the given page, with
+    reference to neighboring pages.  'pages' must be a
+    windowed_iterator; 'window', if provided, will look to a smaller
+    set of neighboring pages to determine a likely page number.
+    (Smaller than that provided by the given windowed_iterator.)
     """
     if window is None:
         window = pages.window
