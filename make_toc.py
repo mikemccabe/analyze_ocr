@@ -92,7 +92,6 @@ def make_toc(iabook, pages):
             continue
         # l("%s: %s %s" % (page.index, page.info['number'],
         #                      page.info['type']))
-        score = 0
         good_toc_count = 0
         for i, tc in enumerate(tcs):
             if i < starttoc:
