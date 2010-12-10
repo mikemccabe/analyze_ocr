@@ -83,10 +83,6 @@ def make_toc(iabook, pages):
     max_assumed_toc_len = 4
     endtoc = sys.maxint
     for page in pages:
-        if (len(page.info['number']) == 0
-            and 'pageno_guess' in page.info):
-            page.info['number'] = str(page.info['pageno_guess'])
-
         # skip on if we're waiting for a contents page
         if (len(tcs) == 0
             and contentscount > 0

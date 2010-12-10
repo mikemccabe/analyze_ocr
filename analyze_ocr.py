@@ -125,6 +125,11 @@ def analyze(windowed_pages):
         if pagenos:
             find_pagenos.guess_best_pageno(page, windowed_pages,
                                            windowed_pages.window)
+            # use guess if number is not supplied
+            if (len(page.info['number']) == 0
+                and 'pageno_guess' in page.info):
+                page.info['number'] = str(page.info['pageno_guess'])
+
         # if hfs:
         #     find_header_footer.guess_hf(page, windowed_pages)
         yield page
