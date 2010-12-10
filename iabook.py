@@ -121,6 +121,15 @@ class Book(object):
         return leafcount
 
 
+    def get_contents_indices(self):
+        result = []
+        for i, scandata_page in enumerate(self.get_scandata_pages_djvu()):
+            pagetype = scandata_page.findtext('%spageType' % self.scandata_ns)
+            if pagetype.lower() == 'contents':
+                result.append((i, scandata_page.get('leafNum')))
+        return result
+
+
     def get_contents_count(self):
         return len([True for e
                     in self.scandata.findall('.//%spageType' % (self.scandata_ns))

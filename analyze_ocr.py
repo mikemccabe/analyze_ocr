@@ -52,6 +52,8 @@ def main(argv):
     pages = analyze(windowed_pages)
     toc_result = make_toc.make_toc(iabook, pages)
 
+    toc_result['contents_leafnos'] = iabook.get_contents_indices()
+
     toc_result['readable'] = print_readable(toc_result['qdtoc'])
 
     if opts.human:
