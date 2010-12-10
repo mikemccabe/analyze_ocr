@@ -92,17 +92,24 @@ def make_toc(iabook, pages):
     max_allowed_toc_len = 7
 
     # these values control comparing book pages to a sliding window of
-    # already-found toc pages.
+    # already-found toc pages.  Can result in early toc candidates
+    # being 'shadowed' by spurious later ones - e.g. lists of
+    # illustration.
+    windowed_match = False
 
     # first candidate toc page to compare subsequent pages to; this is
     # adjusted upward as new candidate pages are found.
     toc_window_start = 0
 
-    # at most this many toc pages are checked forward of the
-    # most recently threshold-making toc
-    toc_window_size = 3
+    # at most this many toc pages are checked against current body
+    # page forward of the most recently threshold-making toc
+    toc_window_size = 1
 
     toc_window_end = sys.maxint
+
+    # the last tocpage may be below the threshold, but is only kept if
+    # it's above this
+    trailing_tocpage_threshold = 1
 
     for page in pages:
         # skip on if we're waiting for a contents page
@@ -116,10 +123,11 @@ def make_toc(iabook, pages):
         #                      page.info['type']))
         good_toc_count = 0
         for i, tc in enumerate(tcs):
-            if i < toc_window_start:
-                continue
-            if i > toc_window_end:
-                continue
+            if windowed_match:
+                if i < toc_window_start:
+                    continue
+                if i > toc_window_end:
+                    continue
             tc.match_page(page)
             if tc.score > toc_threshold:
                 toc_window_start = i
@@ -137,13 +145,37 @@ def make_toc(iabook, pages):
                 and page.info['type'] == 'contents')):
                 tcs.append(TocCandidate(page))
 
+    # adjust tc scores to promote trailing pages
+    saw_good_score = False
+    for i, tc in enumerate(tcs):
+        tc.adj_score = tc.score
+        if not saw_good_score:
+            if tc.score > toc_threshold:
+                saw_good_score = True
+                continue
+        if (tc.score < toc_threshold and
+            tc.score > trailing_tocpage_threshold and
+            i + 1 < len(tcs) and
+            tcs[i + 1].score < toc_threshold):
+            tc.adj_score = toc_threshold
+            break
+
     # (for qdtoc algorithm)
     # Go through all tc candidates
-    # - append to toc struct based on matches / nearno (this is what I was doing visualization for)
+    # - append to toc struct based on matches / nearno
     # - collect from tc: pageno cands = pageno_cands / pageno_cands_unfiltered
     all_pageno_cands = []
     for i, tc in enumerate(tcs):
-        if tc.score > toc_threshold:
+        score = tc.score
+
+        # if tc is not last, but *next* tc is below threshold,
+        # accept if better than trailing_tocpage_threshold.
+        if i + 1 < len(tcs):
+            if (tcs[i + 1].score < toc_threshold and
+                tc.score >= trailing_tocpage_threshold):
+                score = toc_threshold
+
+        if score >= toc_threshold:
             for match in tc.matches:
                 info = tc.matchinfo[match]
                 tocitem_words = info.matchwords()
@@ -155,7 +187,6 @@ def make_toc(iabook, pages):
                                       'title':(' '.join(titlewords)).strip(), 'pagenum':pagenum,
                                       'tocpage':i
                                       })
-            # import pdb; pdb.set_trace()
             if i == 0:
                 all_pageno_cands += tc.pageno_cands
             else:
@@ -385,10 +416,13 @@ class TocCandidate(object):
         self.matches = IntervalSet()
         self.matchinfo = {}
         self.score = 0
+        self.adj_score = 0 # 'adjusted' score; as to boost last page in toc
         self.set_base_score()
 
 
     def set_base_score(self):
+        if self.page.info['type'] == 'contents':
+            self.score += 5
         labelcount = 1
         for i, w in enumerate(self.words):
             if w in labels:
