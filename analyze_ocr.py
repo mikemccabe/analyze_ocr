@@ -63,7 +63,6 @@ def main(argv):
         if callback is not None:
             print '%s(' % callback
             print json.dumps(toc_result)
-            # print_one_per_line(qdtoc)
         if callback is not None:
             print ')'
         else:
@@ -88,15 +87,6 @@ def print_readable(a):
                                   el['title'].ljust(maxtlen + 3),
                                   el['pagenum'].rjust(3))
     return '\n'.join(printel(el) for el in a)
-
-
-def print_one_per_line(a):
-    print '['
-    print ',\n'.join(json.dumps(el) for el in a)
-    # for el in a:
-    #     print json.dumps(el) + ','
-    print ']'
-
 
 
 def filter(pages):
