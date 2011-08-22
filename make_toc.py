@@ -14,14 +14,14 @@ VERBOSE = True
 
 # just look at 1rst n words in page when deciding whether to mark it
 # as a TOC.
-FIRSTN = 15
+FIRSTN = 30
 
 # try to guess at the situation where we've grabbed a compact
 # sequence of number that aren't pagenos - common case is
 # chapter numbers.  If first numbers are closely spaced, and
 # skipping them still gives a reasonable (different) sequence,
 # go ahead and skip them.
-less_greedy_heuristic = True
+# less_greedy_heuristic = True
 less_greedy_heuristic = False
 
 # how far across the page a number need be before it's considered a
@@ -56,6 +56,8 @@ def make_toc(iabook, pages):
         result['has_contents'] = False
     if not iabook.has_pagenos():
         result['has_pagenos'] = False
+
+    # XXXmm these might help with speed
 
     # if not iabook.has_pagenos():
     #     result['failedbkno'] = 'nope'
@@ -260,6 +262,11 @@ def promote_leading_increasing_numeric_titlewords(toc):
                 ti['title'] = splits[i][1].strip()
 
 def cleanup_toc(toc):
+    if len(toc) > 1:
+        if (toc[0]['pagenum'] == 'i' and
+            toc[1]['pagenum'].isdigit()):
+            toc[0]['pagenum'] = '1'
+    
     for ti in toc:
         ti['title'] = re.sub(r'\s*[.\-\s_,]*\s*$', '', ti['title'])
     # promote_leading_increasing_numeric_titlewords(toc)
