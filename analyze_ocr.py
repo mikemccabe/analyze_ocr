@@ -113,9 +113,9 @@ def annotate(pages):
 
         page.info['bounds'] = page.find_text_bounds()
 
-        # XXXmm commented out for speed
-        # if pagenos:
-        #     find_pagenos.annotate_page(page)
+        # XXXmm comment out for speed
+        if pagenos:
+            find_pagenos.annotate_page(page)
         # if hfs:
         #     find_header_footer.annotate_page(page)
         yield page
@@ -125,15 +125,13 @@ def annotate(pages):
 def analyze(windowed_pages):
     for page in windowed_pages:
         if pagenos:
-            pass
-        
-            # XXXmm commented out for speed
-            # find_pagenos.guess_best_pageno(page, windowed_pages,
-            #                                windowed_pages.window)
-            # # use guess if number is not supplied
-            # if (len(page.info['number']) == 0
-            #     and 'pageno_guess' in page.info):
-            #     page.info['number'] = str(page.info['pageno_guess'])
+            # XXXmm comment out for speed
+            find_pagenos.guess_best_pageno(page, windowed_pages,
+                                           windowed_pages.window)
+            # use guess if number is not supplied
+            if (len(page.info['number']) == 0
+                and 'pageno_guess' in page.info):
+                page.info['number'] = str(page.info['pageno_guess'])
 
         # if hfs:
         #     find_header_footer.guess_hf(page, windowed_pages)
