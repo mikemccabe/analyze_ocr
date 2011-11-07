@@ -8,6 +8,11 @@ import json
 
 opts = None
 
+hardcode_toc_pages = None
+# hardcode_toc_pages = range(16,18)
+hardcode_nottoc_pages = None
+# hardcode_nottoc_pages = [18]
+
 djvu = True
 # djvu = False
 pagenos = False
@@ -50,7 +55,7 @@ def main(argv):
         page.clear()
     windowed_pages = windowed_iterator(pages, 5, clear_page)
     pages = analyze(windowed_pages)
-    toc_result = make_toc.make_toc(iabook, pages)
+    toc_result = make_toc.make_toc(iabook, pages, hardcode_toc_pages, hardcode_nottoc_pages)
 
     toc_result['contents_leafnos'] = iabook.get_contents_indices()
 
