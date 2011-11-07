@@ -41,8 +41,9 @@ def l(result, comment):
 def failit(tr, s):
     l(tr, s)
     tr['isok'] = False
+    tr['isok'] = True
 
-def make_toc(iabook, pages):
+def make_toc(iabook, pages, contents_leafs=None, not_contents_leafs=None):
     result = { 'isok': True,
                'has_contents': True,
                'has_pagenos': True,
@@ -59,15 +60,21 @@ def make_toc(iabook, pages):
 
     # XXXmm these might help with speed
 
-    # if not iabook.has_pagenos():
-    #     result['failedbkno'] = 'nope'
-    #     failit(result, 'failed bc no pagenos marked')
-    #     return result
+#     if iabook.has_pagenos():
+#         result['failedbkno'] = 'nope'
+#         failit(result, 'already saw these books')
+#         return result
 
-    # if contentscount == 0:
-    #     result['failedbkno'] = 'nope'
-    #     failit(result, 'failed bc no contents page marked')
-    #     return result
+
+#     if not iabook.has_pagenos():
+#         result['failedbkno'] = 'nope'
+#         failit(result, 'failed bc no pagenos marked')
+#         return result
+
+#     if contentscount == 0:
+#         result['failedbkno'] = 'nope'
+#         failit(result, 'failed bc no contents page marked')
+#         return result
 
 
     # loop through all pages.  For some set of early pages, make
@@ -84,14 +91,14 @@ def make_toc(iabook, pages):
     skip_pages_until_index = 0
 
     # Try this many toc pages (starting at skip_pages) if none marked
-    toc_count_to_try_if_no_contents_info = 20
+    toc_count_to_try_if_no_contents_info = 40 # 20
 
     # Try this many toc pages if 1 is marked
-    toc_count_to_try_if_contents_info = 8
+    toc_count_to_try_if_contents_info = 40 # 8
 
     # fail if more than this many contiguous good toc pages are seen
     # should be less than two vars above...
-    max_allowed_toc_len = 7
+    max_allowed_toc_len = 40 # 7
 
     # these values control comparing book pages to a sliding window of
     # already-found toc pages.  Can result in early toc candidates
@@ -144,8 +151,17 @@ def make_toc(iabook, pages):
         if ((contentscount == 0 and len(tcs) < toc_count_to_try_if_no_contents_info)
             or (contentscount == 1 and len(tcs) < toc_count_to_try_if_contents_info)
             or (contentscount > 1 and len(tcs) < contentscount
-                and page.info['type'] == 'contents')):
+                and page.info['type'] == 'contents')
+            or (contents_leafs and page.index in contents_leafs)):
                 tcs.append(TocCandidate(page))
+        # break early if contents_leafs is around
+        if contents_leafs and page.index - 1 in contents_leafs and not page.index in contents_leafs:
+            break
+        # support hardcode_toc_pages
+        if contents_leafs and page.index in contents_leafs:
+            tcs[-1].score = 10
+        if not_contents_leafs and page.index in not_contents_leafs:
+            tcs[-1].score = -10
 
     # adjust tc scores to promote trailing pages
     saw_good_score = False
@@ -393,6 +409,9 @@ class RangeSet(object):
                     and r.match.b + r.match.size >= rs.match.b)):
                 yield rs
 
+
+words_so_far = []
+
 class TocCandidate(object):
     def __init__(self, page):
         self.page = page
@@ -400,6 +419,11 @@ class TocCandidate(object):
         self.wordtuples = [word for word in page.get_words()]
         self.words = [word.text for word in self.wordtuples]
         self.rawwords = [word for word in page.get_words_raw()]
+
+        # XXX MM DEBUG
+#         self.words = [word.text for word in page.get_words_raw()]
+
+
         # self.words = [word.text for word in page.get_words()]
         # print self.words
         # for i in range(4):
@@ -701,7 +725,15 @@ class TocCandidate(object):
         # for c in self.pageno_cands:
         #     valid_pages[c.word_index] = c
         # print valid_pages
-        words_so_far = []
+        
+        global words_so_far
+
+        # flush accumulated words_so_far (possible wordy chapter
+        # titles from previous pages if too short, as it's then more
+        # likely to be pagenos / noise
+        if len(words_so_far) < 4:
+            words_so_far = []
+#        words_so_far = []
         firstword = True
         prev_word = ''
         result = []
